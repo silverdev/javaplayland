@@ -1,6 +1,9 @@
 class window.CodeInterpreter
     constructor: (@commands) ->
         @buildNeededParsers()
+        @usesRemaining = {}
+        for command of @commands
+            @usesRemaining[command] = @commands[command]['maxUses']
         return
 
     buildNeededParsers: ->
@@ -20,8 +23,17 @@ class window.CodeInterpreter
                 return command
         return null
 
+    scanCommand: (line) ->
+        for command of @commands
+            result = @commands[command]['parser'].exec line
+            if result != null
+                parameters = @processCommand command, result[1]
+                return {"command": command, "parameters": parameters}
+        return null
+
     executeCommands: (commandMap) ->
         for commandCard in @commandStack
+            commandCard.parameters.push commandCard.line
             commandMap[commandCard.command].apply commandMap, commandCard.parameters
         commandMap.finishedParsingStartGame()
         return
@@ -34,44 +46,55 @@ class window.CodeInterpreter
             remaining.
         ###
         @commandStack = []
-        usesRemaining = {}
         for command of @commands
-            usesRemaining[command] = @commands[command]['maxUses']
+            @usesRemaining[command] = @commands[command]['maxUses']
 
-        currentLine = 0
+        currentLine = 1
         while text != ""
             result = null
             for command of @commands
                 result = @commands[command]['parser'].exec text
                 if result != null
-                    usesRemaining[command]--
-                    parameters = @processCommand command, result[1], usesRemaining
-                    @commandStack.push {command: command, parameters: parameters}
+                    @usesRemaining[command]--
+                    parameters = @processCommand command, result[1]
+                    @commandStack.push {
+                        command: command,
+                        parameters: parameters,
+                        line: currentLine
+                    }
                     break
 
+            # Remove whitespace
             if result == null
                 result = /^\s+/.exec text
-                if result != null
-                    if result[0].indexOf('\n') != -1
-                        currentLine++
 
+            # Recognize a semicolon
             if result == null
                 result = /^;/.exec text
 
+            # Ignore single comments
             if result == null
-                # We do not recognize this line, ignore it.
-                result = /^.*\n/.exec text
-                if result != null
-                    currentLine++
+                result = /^\/\/.*(?:\n || $)/.exec text
+
+            # Ignore Mult-Line comments
+            if result == null
+                result = /^\/\*(.*\n)*\*\//.exec text
+
+            # We do not recognize this line, ignore it.
+            if result == null
+                result = /^.*(?:\n || $)/.exec text
 
             if result == null
                 # None of our regexes returned, eat the first character and continue
+                if(text.charAt(0)=='\n')
+                    currentLine++
                 text = text.substring 1
             else
+                currentLine += result[0].replace(/[^\n]+/g,"").length;
                 text = text.substring result[0].length
-        return usesRemaining
+        return @usesRemaining
 
-    processCommand: (command, innerText, usesRemaining) ->
+    processCommand: (command, innerText) ->
         ###
             Processes a found command.
         ###
@@ -83,7 +106,7 @@ class window.CodeInterpreter
             # for command of @commands
                 # result = @commands[command]['parser'].exec innerText
                 # if result != null
-                #     usesRemaining[command]--
+                #     @usesRemaining[command]--
                 #     @processCommand command, result[1]
                 #     break
 
