@@ -3,11 +3,50 @@
 root = exports ? this.codeland = {}
 root.UIcont = null
 
+#IE Support ....
+
+# if ( ! window.console)
+#     window.console= { log: -> }
+
+
+#Chrome support: 'this' must be the console object
+#log = (mesg)-> console.log mesg
+
 root.initialize = (UIcont) ->
+    $('#copyrightinfo').click -> window.AboutPage()
+    root.gameSelectionScrollPosition = 0
     root.loadJSONConfigs()
-    root.UIcont = UIcont
+    root.initializeDoppio()
+    root.UIcont = UIcont    
+    return
+
+root.initializeDoppio = ->
+    root.doppioReady = false
+    root.doppioPreloaded = false
+    root.doppioAPI = new DoppioApi null, root.log
+    root.preloadDoppio()
+    return
+
+root.preloadDoppio = ->
+    if root.doppioPreloaded == false
+        root.doppioAPI.preload root.beanshellPreload, root.wrapperCompiled
+        root.doppioPreloaded = true
+    return
+
+root.wrapperCompiled = =>
+    root.doppioReady = true
+    console.log 'Finished Preloading Doppio'
     player = root.getPlayer()
     root.drawGameMap(player)
+    window.appendBar("#mainbody")
+    if root.wrapperCompiledCallback?
+        console.log 'Found Callback, running'
+        root.wrapperCompiledCallback()
+    return
+
+root.waitForWrapper = (callback) ->
+    root.wrapperCompiledCallback = callback
+    return
 
 root.reference = () ->
 
@@ -16,22 +55,40 @@ root.drawGameMap = (player) ->
     descriptions = root.getGameDescriptions()
     mapDiv = $(root.UIcont)
     mapDiv.empty()
+
     gameSequence = root.getGameSequence()
     sel = new gameSelector(mapDiv, false)
+    count = 0
     addGameToMap = (game) ->
         # console.log "Game: #{game}"
-        sel.buildDiv(game, descriptions[game], player.games[game], root.canPlay(game), codeland)
+        count = count + 1
+        sel.buildDiv(count, game, descriptions[game], player.games[game], root.canPlay(game), codeland)
     addGameToMap game for game in gameSequence
+    tmp1 = document.getElementById("gameSelection")
+
+    $('<span style="font-size:200%">Choose your Java Game</span><br>').prependTo tmp1
+    $('<img src="/img/cc0/treasuremap-128px.png">').prependTo tmp1
+
+    $('#gameSelection').animate {
+        scrollTop: root.gameSelectionScrollPosition
+    }, 0
     #TODO FADE IN
     return
 
 root.startGame = (game) ->
     console.log("Starting #{game}")
+    for quest, index in root.quests
+        found = quest.games.indexOf game
+        if found != -1
+            root.currentQuest = root.quests[index]
+            break
     root.currentGame.finishGame() if root.currentGame
 
     gamediv = $(root.UIcont)
     tmp1 = document.getElementById("gameSelection")
-    root.UIcont.removeChild(tmp1)
+    if tmp1 != null
+        root.gameSelectionScrollPosition = tmp1.scrollTop
+        root.UIcont.removeChild(tmp1)
 
     #Todo FADE IN
 
@@ -39,26 +96,19 @@ root.startGame = (game) ->
     env = {
         key: game
         description : description
-        visualMaster: root.visualMaster
-        frameRate: root.visualMaster.frameRate
+        visualMaster: root.visualMasters[game]
+        frameRate: root.visualMasters[game].frameRate
         gamediv : gamediv
         player : root.getPlayer()
         codeland : this
+        backEnd: description.backEnd
+        gameState: description.gameState
     }
-
-    managerString  = description?.manager ?= 'GameManager'
-
-    root.currentGame = new window[managerString](env)
-
+    root.currentGame = new GameManager env
     root.currentGame.startGame()
+    return
 
 deepcopy = (src) -> $.extend(true, {}, src)
-
-#IE Support ....
-# if not console?
-#     console = {}
-if console.log == null
-    console.log = -> return
 
 # BACKEND Methods useful for all games
 root.getString = (key) -> localStorage.getItem key
@@ -83,10 +133,12 @@ root.store = (key, val) ->
 root.storeGameCompletionData = (key, data) ->
     throw new Error("Cannot be null") unless key? && data?
     root.updatePlayer((p)-> p.games[key] = data)
-    root.showMap()
     return
 
 root.showMap = () ->
+    root.currentGame.finishGame() if root.currentGame
+    root.wrapperCompiledCallback = null if root.wrapperCompiledCallback?
+    root.currentGame = null
     root.drawGameMap root.getPlayer()
     return
 
@@ -120,34 +172,136 @@ root.clearPlayer = ->
     root.clearString "CurrentPlayer"
     return
 
+root.readJSON = (theurl, cb) ->
+    fail = false
+    console.log "Reading #{theurl}"
+    try
+        jQuery.ajax {
+            dataType: 'json',
+            url: theurl,
+            async: false,
+            error : () ->
+                fail = true
+                console.log "Could not read #{theurl}"
+                cb(undefined)
+                return
+            success: (data) ->
+                cb(data)
+                return
+            }
+    catch exception
+        fail= true
+        console.log "#{theurl}: #{exception} #{exception.message} #{exception.stack}"
+    if(fail)
+        throw "Configuration Exception reading #{theurl}"
+    return
+
 root.loadJSONConfigs = () ->
     if not root.gameDescriptions?
         root.gameDescriptions = {}
-
-    jQuery.ajax({
-        dataType: 'json',
-        url: 'config/quest1.json',
-        async: false,
-        success: (data) ->
-            for game in data.games
-                jQuery.ajax({
-                    dataType: 'json',
-                    url: "config/#{game}.json"
-                    async: false,
-                    success: (gameData) ->
-                        root.gameDescriptions[game] = gameData
+    configFail = false
+    root.readJSON 'config/config.json', (data) ->
+        if data == undefined
+            configFail = true
+        root.baseDefaults = data.defaults
+        root.gameDefaults = {}
+        for type in data.gameTypes
+            root.readJSON "config/#{type}", (typeData) ->
+                if typeData == undefined
+                    configFail = true
+                root.gameDefaults[typeData.gameType] = typeData
+                return
+        root.quests = []
+        root.visualMasters = {}
+        root.beanshellPreload = data.beanshellPreload
+        questIndex = 0
+        for quest in data.quests
+            root.readJSON "config/#{quest}", (questData) ->
+                if questData == undefined
+                    configFail = true
+                root.quests[questIndex++] = questData
+                for game in questData.games
+                    root.readJSON "config/#{game}.json", (gameData) ->
+                        if gameData == undefined
+                            configFail = true
+                        try
+                            root.addToObject root.baseDefaults, gameData
+                            root.addToObject root.gameDefaults[gameData.gameType].defaults, gameData
+                            root.visualMasters[game] = root.gameDefaults[gameData.gameType].visualMaster
+                            root.stringifyConfigArrays gameData
+                            root.convertShorthandToCode gameData
+                            root.addHintsToCode gameData
+                            root.gameDescriptions[game] = gameData
+                            return
+                        catch error
+                            configFail = true
+                            console.log "#{error} #{error.message} #{error.stack}"
                         return
-                    })
-            return
-    });
-    jQuery.ajax({
-        dataType: 'json',
-        url: 'config/visualMaster.json',
-        async: false,
-        success: (data) ->
-            root.visualMaster = data
-            return
-        })
+                return
+        root.currentQuest = root.quests[0]
+        return
+    if configFail
+        root.gameDescriptions = null
+        throw "Configuration Exception"
+    return
+
+root.addToObject = (source, destination) ->
+    for key, value of source
+        if key of destination
+            if typeof value == "object"
+                root.addToObject value, destination[key]
+        else
+            destination[key] = value
+    return
+
+root.stringifyConfigArrays = (gameData) ->
+    gameData.game.map = gameData.game.map.join '\n' if gameData?.game.map?.join?
+    gameData.code.prefix = gameData.code.prefix.join '\n' if gameData?.code.prefix.join?
+    if gameData.code.prefix.charAt(gameData.code.prefix.length - 1) != '\n'
+        gameData.code.prefix += '\n'
+    gameData.code.postfix = gameData.code.postfix.join '\n' if gameData?.code.postfix.join?
+    gameData.code.initial = gameData.code.initial.join '\n' if gameData?.code.initial?.join?
+    return
+
+root.convertShorthandToCode = (gameData) ->
+    if gameData.code.initial?
+        return
+    initial = ''
+    shorthand = gameData.code.shorthand
+    if not shorthand?
+        return
+    while shorthand != ''
+        for short in gameData.code.shorthandKey
+            re = new RegExp short.regex
+            result = re.exec shorthand
+            if result != null
+                if initial != ''
+                    last = initial.substring(initial.length - 1)
+                    if last == ';'
+                        initial += '\n'
+                    else if last != '\n'
+                        initial += '();\n'
+                initial += short.repl
+                break
+        if result == null
+            result = /\(.*?\)/.exec shorthand
+            if result != null
+                initial += result[0] + ';'
+        if result != null
+            shorthand = shorthand.substring result[0].length
+        else
+            shorthand = shorthand.substring 1
+    if initial != '' && initial.substring(initial.length - 1) != ';'
+        initial += '();'
+    gameData.code.initial = initial
+    return
+
+root.addHintsToCode = (gameData) ->
+    if gameData.code.comments
+        # Also ensures newlines in the data are properly commented out
+        one = '// '+ ((gameData.code.comments.join('\n')).replace(/\n/g,'\n// '))
+        gameData.code.initial = one + '\n' + \
+            (if gameData.code.initial? then gameData.code.initial else '')
     return
 
 root.getGameDescriptions = ->
@@ -169,7 +323,6 @@ root.getGameSequence = ->
     addGame(g) for g,ignore of games
     return root.gameSequence
 
-
 root.canPlay = (game) ->
     player = root.getPlayer()
     #If already completed then no need to check dependencies
@@ -183,3 +336,4 @@ root.canPlay = (game) ->
 
     passCount++ for g in depends when player?.games[g]?.passed
     return passCount == depends.length
+    return

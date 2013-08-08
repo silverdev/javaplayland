@@ -1,8 +1,99 @@
+#gameSelection {
+    left: 5%;
+}
+
+body {
+    font-family: bitter;
+}
+
+.ex {
+    width:80%;
+    height:130px;
+    margin:0 0 0 10%;
+    border:1px solid black;
+}
+
+.ei {
+    float: left;
+    height:100%;
+    width:80%;
+}
+
+.eo {
+    position: relative;
+    left:80%;
+    top:0;
+    height:100%;
+    width:19%;
+    font-family: monospace;
+    font-size: 125%;
+    white-space: pre-wrap;
+    padding-left:1%;
+    border-left:1px solid gray;
+}
+
+.eo>div {
+    position:absolute;
+}
+
+.rp {
+    margin:10px 40px 10px 40px;
+}
+
+tt {
+    font-size: 16px;
+}
+
+.pseudo {
+    font-family: monospace;
+    white-space: pre-wrap;
+    margin: 10px 0px 10px 15%;
+}
+
+#buttons {
+    width:75% !important;
+    position:absolute;
+    left:1.5% !important;
+    bottom:3%;
+    height: 12%;
+}
+
+#insertButtons {
+    height:100%;
+}
+
+button {
+    height:80%;
+}
+
+.ace_xbutton {
+    float:right;
+    margin:6px 0px;
+}
+
+.ace_uparrow {
+    float:right;
+    margin:0px 0px 0px 0;
+}
+
+.ace_downarrow {
+    float:right;
+    margin:0px 0px 0 0;
+}
+
 .ace_editor {
+    position: relative !important;
+    border-bottom: 1px solid lightgray;
+    height: 80%;
+    width: 100%;
+}
+
+#codeEditor>.ace_editor {
     position: relative !important;
     border: 1px solid lightgray;
     height: 80%;
-    width: 100%;
+    width: 97%;
+    margin: 1.5% 0 0 1.5%;
 }
 
 .game_visual {
@@ -20,6 +111,7 @@
     border: 1px solid #1a1a1a;
     z-index: 100;
     box-shadow: -10px -10px 10 0 black;
+    min-width: 100px;
 }
 
 .pop-up-inside {
