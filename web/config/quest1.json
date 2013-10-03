@@ -1,4 +1,5 @@
-{
+{ "key" : "sequence",
+  "title" : "Code Sequence",
   "games": [
 "seq0150",
 "seq0250",
@@ -10,8 +11,7 @@
 "seq0850",
 "seq0950",
 "seq1050",
-"seq1150",
-"seq1250"
+"seq1150"
   ],
   "commands": [
     "go(I)V",

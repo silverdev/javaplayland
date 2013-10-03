@@ -74,7 +74,22 @@ window.sandBoxPage = () ->
     $(".en").click(enClick)
     $("#bF").click(closeClick)
 
-    setUpJavaSandbox input, output, ""
+    samplecode=[
+        "////Write your Java statements here",
+        "int answer = 6*7;",
+        "print(answer);",
+        "String text=\"Hello World\";",
+        "text = text.toUpperCase();",
+        "for(int i=10;i>0;i--) {",
+        "\tprint(i);",
+        "}",
+        "String ello = text.substring(1, text.length()); // Drop first character",
+        "print(text);",
+        "print(ello);",
+        "int[] array = new int[] {2,3,5,7,11,13};",
+        "print(array);"
+    ].join('\n')
+    setUpJavaSandbox input, output, samplecode
     return
 
 
@@ -156,7 +171,7 @@ setUpJavaSandbox = (input, output, texti) ->
 
     run = jQuery '<img>', {
         id: 'runCode'+editorCount,
-        src: '/img/freeware/button_play_green-48px.png',
+        src: 'img/freeware/button_play_green-48px.png',
         css: {'max-height':'19%', 'display':'block', 'min-height': '24px'},
         alt: 'Run Button',
         title:'Run the program',
@@ -167,17 +182,16 @@ setUpJavaSandbox = (input, output, texti) ->
 
             msg = ''
             finished_cb = =>
-                #Hide Running... if nothing was printed
+                #Ensure "Running..." is removed even if nothing was printed by the Java program
                 stdout('')
-                jQuery(this).hide()
-                jQuery(this).siblings("img").show()
+                jQuery(this).show()
+                jQuery(this).siblings("img").hide()
             codeland.doppioAPI.abort()
             codeland.doppioAPI.setOutputFunctions stdout, log
             srcText  = sandBoxEditor.getStudentCode()
-            if(srcText.indexOf("[]") != -1)
-                stdout('Arrays are not yet supported by our Web-based Java')
-                jQuery(this).siblings("img").hide()
-                jQuery(this).show()
+            if(srcText.indexOf("class") != -1)
+                stdout('Classes are not yet supported by our Web-based Java')
+                finished_cb()
             else
                 codeland.doppioAPI.run(srcText,null, finished_cb)
 
@@ -186,7 +200,7 @@ setUpJavaSandbox = (input, output, texti) ->
     }
     abort = jQuery '<img>', {
         id: 'abortCode'+editorCount,
-        src: '/img/freeware/button_stop_red-48px.png',
+        src: 'img/freeware/button_stop_red-48px.png',
         css: {'max-height':'19%', 'display':'block', 'min-height': '24px'},
         alt: 'Abort Button',
         title: 'Stop the currently running program',
@@ -242,15 +256,15 @@ window.AboutPage = () ->
     <em>Third-party open-source content</em><br/>
     Sounds from freesound and images from openclipart.org are licensed under <a href='http://creativecommons.org/publicdomain/zero/1.0/''>the creative commons 0 license</a>
     ('game over','level completed' sounds; 'book', 'star' and treasure map icons)<br />
-    The Doppio jvm license is available <a href='https://github.com/int3/doppio/blob/master/LICENSE'>here</a>.
-    <br/>
+    The Doppio jvm license is available <a href='https://github.com/int3/doppio/blob/master/LICENSE'>here</a>.<br/>
+    Last Guardian Sprites by Philipp Lenssen are licensed under the Creative Commons <a href='http://creativecommons.org/licenses/by/3.0/'> attribution license</a>.<br/>
     The yellow arrow icon by Jack Cai and the grey keyboard icon by The Working Group downloaded from findicons.com is licensed under <a href='http://creativecommons.org/licenses/by-nd/2.5/'>Creative Commons Attributions no Derivatives</a>
     <hr>
 
     <em>Acknowledgements</em><br>
     We wish to thank Holly, Maggie and Abby and the other participants at the 2013 University of Illinois Computer Science Summer G.A.M.E.S Camp for their game ideas, feedback and testing.
-
     <br>
+    We wish to thank CJ Carey, John Vilk and the other developers of Doppio-JVM (a project by the <a href='http://plasma.cs.umass.edu/'>Plasma research group at UMass</a>)</a> and BrowserFS for use of their software and their support of this project.<br>
     <em>Software development and bug contribution</em><br>
     Original software created by University of Illinois students and faculty, Chris Liu, Fabian Junge, James Kelly and Lawrence Angrave.
     <br/>

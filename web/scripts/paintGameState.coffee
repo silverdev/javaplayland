@@ -22,7 +22,7 @@ class window.PaintGameState
             @picture.push temp
 
         for name,character of @gameConfig.characters
-            if name.indexOf('Boarder') == -1
+            if name.indexOf('Border') == -1
                 character.color = character.sprite
                 @picture[character.x][character.y] = character
 
@@ -48,15 +48,29 @@ class window.PaintGameState
         @tick++
         return
 
+    # Careful ...Destructive; can only be used once
+    # Returns true if the picture was correctly painted
+    checkPainting: ->
+        #Check border filling
+        for name, pixel of @gameConfig.characters
+            expected = pixel.match
+            expected ?= pixel.color
+            if expected == @picture[pixel.x][pixel.y]?.color
+                    @picture[pixel.x][pixel.y].matched = true
+            else
+                return false
+        # Check for painting over squares that should not have been painted
+        for x in [0..@gameManager.config.visual.grid.gridX]
+            for y in [0..@gameManager.config.visual.grid.gridY]
+                pixel=@picture[x][y]
+                if ! pixel or pixel.matched
+                    continue
+                return false 
+        return true
+
     checkEvents: ->
         if @finishedExecuting
-            won = true
-            for name, pixel of @gameConfig.characters
-                if not pixel.match?
-                    continue
-                if pixel.match != @picture[pixel.x][pixel.y]?.color
-                    won = false
-            if won
+            if @checkPainting()
                 @gameWon()
             else
                 @gameLost()
@@ -94,47 +108,20 @@ class window.PaintGameState
             return "white"
 
     gameWon: =>
-        if not @startedGame
-            return
-        playAudio 'victory.ogg'
-        @stars += 1
-        @score += 5
-        @startedGame = false
-        @gameManager.gameWon @score, @stars
-
-        gameName = @gameManager.gameName()
-        codeland = @gameManager.environment.codeland
-        gameIndex = codeland.currentQuest.games.indexOf gameName
-        questIndex = codeland.quests.indexOf codeland.currentQuest
-        if ++gameIndex == codeland.currentQuest.games.length
-            questIndex = ++questIndex % codeland.quests.length
-            gameIndex = 0
-        gameName = codeland.quests[questIndex].games[gameIndex]
-        messages = []
-        messages[0] = 'Congratulations!'
-        window.objCloud 400, messages,
-            "body", "30%", "30%", 1.5, gameName, @gameManager
-        @gameManager.gameRunFinished()
-        return
+        return if not @startedGame
+        @stopGame()
+        @gameManager.gameWon()
+        return 
 
     gameLost: =>
-        if not @startedGame
-            return
-        if clockHandle?
-            clearInterval clockHandle
-        @startedGame = false
-        playAudio 'defeat.ogg'
-        messages = []
-        messages[0] = "Try Again!"
-        window.objCloud 400, messages,
-            "body", "30%", "30%", 3, "none", @gameManager
-        clockHandle = setInterval @clock, 17
-        @gameManager.gameRunFinished()
+        return if not @startedGame
+        @stopGame()          
+        @gameManager.gameLost()
         return
 
     stopGame: =>
-        if clockHandle?
-            clearInterval clockHandle
+        clearInterval clockHandle if clockHandle?   
+        clockHandle=null 
         @startedGame = false
         return
 

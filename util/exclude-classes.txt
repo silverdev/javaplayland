@@ -44,7 +44,6 @@ java/security/cert
 java/security/interfaces
 java/security/spec
 java/sql
-java/text
 javax/accessibility
 javax/activation
 javax/activity
@@ -86,5 +85,4 @@ sun/print
 sun/rmi
 sun/security
 sun/swing
-sun/text
 sun/tools
