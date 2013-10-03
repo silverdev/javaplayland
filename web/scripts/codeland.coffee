@@ -1,5 +1,15 @@
 "use strict"
 # things assigned to root will be available outside this module
+
+
+# We will update this when running JVM /Beanshell code so that we can show the user the currently executing line
+window.notifyEvalSourcePosition = (startLine,startCol,endLine,endCol) -> 
+    console.log startLine,startCol,endLine,endCol
+    ##window.gameManager.codeEditor.editorGoToLine startLine
+    return;
+
+
+
 root = exports ? this.codeland = {}
 root.UIcont = null
 
@@ -16,24 +26,33 @@ root.initialize = (UIcont) ->
     $('#copyrightinfo').click -> window.AboutPage()
     root.gameSelectionScrollPosition = 0
     root.loadJSONConfigs()
-    root.initializeDoppio()
     root.UIcont = UIcont    
+    root.initializeDoppio()
     return
 
 root.initializeDoppio = ->
     root.doppioReady = false
     root.doppioPreloaded = false
-    root.doppioAPI = new DoppioApi null, root.log
-    root.preloadDoppio()
-    return
-
-root.preloadDoppio = ->
-    if root.doppioPreloaded == false
-        root.doppioAPI.preload root.beanshellPreload, root.wrapperCompiled
+    progress= $('#progress')
+    count = 0;
+    last_display = ""
+    progress_cb = (ignore_incorrect_fraction)->
+        count = count + 1
+        display = Math.floor((100*count) / 391) 
+        if(display==100) 
+            display = "Starting Java Virtual Machine..."
+        else display = "Opening "+display
+        if(last_display != display)
+            last_display = display
+            progress.html display
+    preload_cb = ->
+        root.doppioAPI.preload root.beanshellPreload, root.wrapperCompiled_cb
         root.doppioPreloaded = true
+    root.doppioAPI = new DoppioApi null, preload_cb, progress_cb
     return
 
-root.wrapperCompiled = =>
+
+root.wrapperCompiled_cb = =>
     root.doppioReady = true
     console.log 'Finished Preloading Doppio'
     player = root.getPlayer()
@@ -58,15 +77,21 @@ root.drawGameMap = (player) ->
 
     gameSequence = root.getGameSequence()
     sel = new gameSelector(mapDiv, false)
+    tmp1 = document.getElementById("gameSelection")
+
     count = 0
     addGameToMap = (game) ->
         # console.log "Game: #{game}"
         count = count + 1
         sel.buildDiv(count, game, descriptions[game], player.games[game], root.canPlay(game), codeland)
-    addGameToMap game for game in gameSequence
-    tmp1 = document.getElementById("gameSelection")
-
-    $('<span style="font-size:200%">Choose your Java Game</span><br>').prependTo tmp1
+#    addGameToMap game for game in gameSequence
+    qcount = 0
+    for quest in root.quests
+        $("<div bgcolor='#888888'>Quest #{++qcount}:#{quest.title}</div>").appendTo tmp1
+        for gameKey in quest.games
+            addGameToMap gameKey
+ 
+    $('<span style="font-size:200%" class="cursiveHeadline">Choose your Java Game</span><br>').prependTo tmp1
     $('<img src="/img/cc0/treasuremap-128px.png">').prependTo tmp1
 
     $('#gameSelection').animate {
@@ -83,7 +108,8 @@ root.startGame = (game) ->
             root.currentQuest = root.quests[index]
             break
     root.currentGame.finishGame() if root.currentGame
-
+    root.currentGame = null
+    
     gamediv = $(root.UIcont)
     tmp1 = document.getElementById("gameSelection")
     if tmp1 != null
@@ -93,6 +119,10 @@ root.startGame = (game) ->
     #Todo FADE IN
 
     description = root.getGameDescriptions()[game]
+    stats = root.loadGameStats(game) 
+    stats.openedCount++
+    root.storeGameStats(game,stats)
+    
     env = {
         key: game
         description : description
@@ -103,9 +133,12 @@ root.startGame = (game) ->
         codeland : this
         backEnd: description.backEnd
         gameState: description.gameState
+        stats : stats        
     }
+    #Not used ... window.location.hash='game='+encodeURIComponent(game)
     root.currentGame = new GameManager env
     root.currentGame.startGame()
+    root.currentGame.helpTips() unless env.stats.runCount >0
     return
 
 deepcopy = (src) -> $.extend(true, {}, src)
@@ -129,10 +162,29 @@ root.store = (key, val) ->
     root.setString(key, JSON.stringify val)
     return
 
+root.loadGameStats = (gameKey) ->
+    p=root.getPlayer()
+    data = p.games[gameKey] ?= {}
+#Ensure we have the minimum number of expect properties
+    data.abortCount ?=0
+    data.runCount ?=0
+    data.winCount ?=0
+    data.lostCount ?=0
+    data.resetCount ?=0
+    data.openedCount ?=0
+    data.hiscore ?=0
+    data.passed ?= false
+    data.stars ?= 0
+    data.tipsCount ?= 0
+    return data
+
 #Updates the player data
-root.storeGameCompletionData = (key, data) ->
+root.storeGameStats = (key, data) ->
     throw new Error("Cannot be null") unless key? && data?
-    root.updatePlayer((p)-> p.games[key] = data)
+    root.updatePlayer((p)-> 
+        p.games[key] ?= {} 
+        $.extend(p.games[key],data)
+    )
     return
 
 root.showMap = () ->
@@ -153,13 +205,7 @@ root.getPlayer = ->
         first : ''
         last : ''
         avator : 'generic'
-        games : {
-            java1a : {
-                hiscore : 20
-                stars : 1
-                passed : true
-            }
-        }
+        games : { }
     }
 
 root.updatePlayer = (callback) ->
@@ -214,12 +260,13 @@ root.loadJSONConfigs = () ->
         root.quests = []
         root.visualMasters = {}
         root.beanshellPreload = data.beanshellPreload
-        questIndex = 0
+        questIndex = -1
         for quest in data.quests
             root.readJSON "config/#{quest}", (questData) ->
-                if questData == undefined
+                if questData == undefined or questData.key == undefined
                     configFail = true
-                root.quests[questIndex++] = questData
+                ++questIndex
+                root.quests[questIndex] = questData
                 for game in questData.games
                     root.readJSON "config/#{game}.json", (gameData) ->
                         if gameData == undefined
@@ -297,11 +344,15 @@ root.convertShorthandToCode = (gameData) ->
     return
 
 root.addHintsToCode = (gameData) ->
+    gameData.code.initial?=''
     if gameData.code.comments
         # Also ensures newlines in the data are properly commented out
-        one = '// '+ ((gameData.code.comments.join('\n')).replace(/\n/g,'\n// '))
-        gameData.code.initial = one + '\n' + \
-            (if gameData.code.initial? then gameData.code.initial else '')
+        one = '// '+ ((gameData.code.comments.join('\n')).replace(/\n/g,'\n// '))+ '\n'
+        # Hints go in prefix if it exists, otherwise they are prepended to the main area
+        if gameData.code.prefix.length > 1 # Ignore lonely \n
+            gameData.code.prefix = one + gameData.code.prefix
+        else 
+            gameData.code.initial = one + '\n' + gameData.code.initial
     return
 
 root.getGameDescriptions = ->
@@ -321,8 +372,8 @@ root.getGameSequence = ->
         root.gameSequence.push name
         return
     addGame(g) for g,ignore of games
-    return root.gameSequence
-
+    return root.gameSequence     
+     
 root.canPlay = (game) ->
     player = root.getPlayer()
     #If already completed then no need to check dependencies

@@ -1,5 +1,5 @@
 {
-  "title": "+1 order?",
+  "title": "Assignment: Plus One",
   "description": "",
   "task": "",
   "tags": "intro",
@@ -16,13 +16,12 @@
     "commands": {
       "shorthand": [
 		{
-          "line": "x = x + 1;",
+          "line": "y = y + 1;",
           "maxUses": 5
         },
-        "y = x + 2;",
 		{
-          "line": "drawPixel(x, y, \"red\");",
-          "maxUses": 5
+          "line": "drawPixel(x, y, \"blue\");",
+          "maxUses": 4
         }
         
       ]
@@ -31,23 +30,21 @@
   "code": {
     "prefix": [
       "void paint() {",
-      "int x = 0;",
+      "int x = 1;",
       "int y = 0;"
     ],
     "postfix": "return;\n}",
     "comments": [
-      "Color Puzzle #7 - '+1 order?'","x = x + 1, means calculate the value of 'x', add one' and \nsave the vaue in variable named 'x'",
-"y = x + 2 means take the current value of variable 'y', add two and save the value in 'y' ",
-"Hint: Not working as expected? Check the order of your statements!"
+      "Color Puzzle #7 - 'Assignment: Plus One'","y = y + 1, calculates the value of 'y plus one' and then saves it in variable named 'y'"
     ]
   },
   "game": {
     "map": [
-      "RRR","","","","...RR"
+      "U","U","U","","U"
 
     ],
     "offset": {
-      "x": 0,
+      "x": 1,
       "y": 0
     }
   },

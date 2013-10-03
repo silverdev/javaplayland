@@ -4,7 +4,7 @@ class window.gameSelector
         $("#acelne").remove()
         tmp = document.createElement("div")
         cont = $(tmp)
-        $(tmp).css(height:'100%', overflow:'auto',position:'relative','font-size':"20" + 'px')
+        $(tmp).css({'height':'100%', 'overflow-y':'scroll','width':'95%','position':'relative','font-size':"20px"})
         $(tmp).attr("id","gameSelection")
         @div.append(tmp)
         return
@@ -29,13 +29,13 @@ class window.gameSelector
             cont.append(span)
 
             
-            src = '/img/stare.png'
+            src = 'img/stare.png'
  
             $(span).click(-> codeland.startGame(game) )            
-            $(span).append count + ' '
+#            $(span).append count + ' '
             $(span).append  desc.title
             if player?.passed is true
-                src = '/img/star.png'
+                src = 'img/star.png'
                 img = jQuery '<img>', {
                     id: 'star',
                     src: src,
